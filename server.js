@@ -1,9 +1,13 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs"); // Added for password hashing
 require("dotenv").config();
 
 const mongoDBUri = process.env.DATABASE_URL;
+const secretKey = process.env.SECRET_KEY;
+
 const app = express();
 
 app.use(cors());
@@ -24,8 +28,69 @@ const favoriteSchema = new mongoose.Schema({
 
 const Favorite = mongoose.model("Favorite", favoriteSchema);
 
-// Add a book to favorites
-app.post("/api/favorites", async (req, res) => {
+// Define a schema for Users
+const userSchema = new mongoose.Schema({
+  username: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
+});
+
+// Hash password before saving
+userSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) return next();
+  this.password = await bcrypt.hash(this.password, 10);
+  next();
+});
+
+const User = mongoose.model("User", userSchema);
+
+// Register a new user
+app.post("/api/register", async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const user = new User({ username, password });
+    await user.save();
+    res.status(201).send("User registered successfully");
+  } catch (error) {
+    res.status(400).send("Registration failed. Username may be taken.");
+  }
+});
+
+// Login and generate JWT token
+app.post("/api/login", async (req, res) => {
+  const { username, password } = req.body;
+  try {
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(401).send("Invalid credentials");
+    }
+    const validPassword = await bcrypt.compare(password, user.password);
+    if (!validPassword) {
+      return res.status(401).send("Invalid credentials");
+    }
+    const token = jwt.sign({ userId: user._id }, secretKey, {
+      expiresIn: "1h", // You can adjust the expiration time
+    });
+    res.json({ token });
+  } catch (error) {
+    res.status(500).send("Login failed");
+  }
+});
+
+// Middleware to verify JWT token
+const verifyToken = (req, res, next) => {
+  const token = req.header("Authorization");
+  if (!token) return res.status(401).send("Access denied");
+  try {
+    const decoded = jwt.verify(token, secretKey);
+    req.userId = decoded.userId;
+    next();
+  } catch (error) {
+    res.status(401).send("Invalid token");
+  }
+};
+
+// Add a book to favorites (authenticated route)
+app.post("/api/favorites", verifyToken, async (req, res) => {
   const newFavorite = new Favorite({
     bookId: req.body.bookId,
     title: req.body.title,
@@ -41,8 +106,8 @@ app.post("/api/favorites", async (req, res) => {
   }
 });
 
-// Retrieve all favorite books
-app.get("/api/favorites", async (req, res) => {
+// Retrieve all favorite books (authenticated route)
+app.get("/api/favorites", verifyToken, async (req, res) => {
   try {
     const favorites = await Favorite.find();
     res.send(favorites);
@@ -51,8 +116,8 @@ app.get("/api/favorites", async (req, res) => {
   }
 });
 
-// Delete a book from favorites
-app.delete("/api/favorites/:bookId", async (req, res) => {
+// Delete a book from favorites (authenticated route)
+app.delete("/api/favorites/:bookId", verifyToken, async (req, res) => {
   try {
     const removedFavorite = await Favorite.findOneAndDelete({
       bookId: req.params.bookId,
