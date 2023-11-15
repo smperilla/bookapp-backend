@@ -35,6 +35,16 @@ const userSchema = new mongoose.Schema({
   password: { type: String, required: true },
 });
 
+// Define a schema for Notes
+const noteSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+  content: { type: String, required: true },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now },
+});
+
+const Note = mongoose.model("Note", noteSchema);
+
 // Hash password before saving
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
@@ -89,6 +99,67 @@ const verifyToken = (req, res, next) => {
     res.status(401).send("Invalid token");
   }
 };
+
+
+// Create a new note (authenticated route)
+app.post("/api/notes", verifyToken, async (req, res) => {
+  const newNote = new Note({
+    userId: req.userId,
+    content: req.body.content
+  });
+
+  try {
+    const savedNote = await newNote.save();
+    res.status(201).send(savedNote);
+  } catch (err) {
+    res.status(500).send(err);
+  }
+});
+
+// Get all notes for a user (authenticated route)
+app.get("/api/notes", verifyToken, async (req, res) => {
+  try {
+    const notes = await Note.find({ userId: req.userId });
+    res.send(notes);
+  } catch (err) {
+    res.status(500).send(err);
+  }
+});
+
+// Update a note (authenticated route)
+app.put("/api/notes/:noteId", verifyToken, async (req, res) => {
+  try {
+    const updatedNote = await Note.findOneAndUpdate(
+      { _id: req.params.noteId, userId: req.userId },
+      { content: req.body.content, updatedAt: Date.now() },
+      { new: true }
+    );
+
+    if (!updatedNote) {
+      return res.status(404).send("Note not found.");
+    }
+    res.send(updatedNote);
+  } catch (err) {
+    res.status(500).send(err);
+  }
+});
+
+// Delete a note (authenticated route)
+app.delete("/api/notes/:noteId", verifyToken, async (req, res) => {
+  try {
+    const deletedNote = await Note.findOneAndDelete({
+      _id: req.params.noteId,
+      userId: req.userId
+    });
+
+    if (!deletedNote) {
+      return res.status(404).send("Note not found.");
+    }
+    res.send(deletedNote);
+  } catch (err) {
+    res.status(500).send(err);
+  }
+});
 
 // Add a book to favorites (authenticated route)
 app.post("/api/favorites", verifyToken, async (req, res) => {
