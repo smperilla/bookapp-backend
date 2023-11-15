@@ -20,6 +20,7 @@ mongoose
 
 // Define a schema for Favorites
 const favoriteSchema = new mongoose.Schema({
+  userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   bookId: String,
   title: String,
   authors: [String],
@@ -92,6 +93,7 @@ const verifyToken = (req, res, next) => {
 // Add a book to favorites (authenticated route)
 app.post("/api/favorites", verifyToken, async (req, res) => {
   const newFavorite = new Favorite({
+    userId: req.userId,
     bookId: req.body.bookId,
     title: req.body.title,
     authors: req.body.authors,
@@ -109,7 +111,7 @@ app.post("/api/favorites", verifyToken, async (req, res) => {
 // Retrieve all favorite books (authenticated route)
 app.get("/api/favorites", verifyToken, async (req, res) => {
   try {
-    const favorites = await Favorite.find();
+    const favorites = await Favorite.find({ userId: req.userId });
     res.send(favorites);
   } catch (err) {
     res.status(500).send(err);
@@ -120,8 +122,10 @@ app.get("/api/favorites", verifyToken, async (req, res) => {
 app.delete("/api/favorites/:bookId", verifyToken, async (req, res) => {
   try {
     const removedFavorite = await Favorite.findOneAndDelete({
+      userId: req.userId,
       bookId: req.params.bookId,
     });
+
     if (!removedFavorite) {
       return res.status(404).send("Book not found.");
     }
