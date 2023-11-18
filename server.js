@@ -2,7 +2,7 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
 const jwt = require("jsonwebtoken");
-const bcrypt = require("bcryptjs"); // Added for password hashing
+const bcrypt = require("bcryptjs"); 
 require("dotenv").config();
 
 const mongoDBUri = process.env.DATABASE_URL;
@@ -11,14 +11,14 @@ const secretKey = process.env.SECRET_KEY;
 const app = express();
 
 app.use(cors());
-app.use(express.json()); // For parsing application/json
+app.use(express.json()); 
 
 mongoose
   .connect(mongoDBUri, { useNewUrlParser: true, useUnifiedTopology: true })
   .then(() => console.log("Connected to MongoDB"))
   .catch((err) => console.error("Could not connect to MongoDB", err));
 
-// Define a schema for Favorites
+
 const favoriteSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   bookId: String,
@@ -29,13 +29,13 @@ const favoriteSchema = new mongoose.Schema({
 
 const Favorite = mongoose.model("Favorite", favoriteSchema);
 
-// Define a schema for Users
+
 const userSchema = new mongoose.Schema({
   username: { type: String, required: true, unique: true },
   password: { type: String, required: true },
 });
 
-// Define a schema for Notes
+
 const noteSchema = new mongoose.Schema({
   userId: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   content: { type: String, required: true },
@@ -45,7 +45,7 @@ const noteSchema = new mongoose.Schema({
 
 const Note = mongoose.model("Note", noteSchema);
 
-// Hash password before saving
+
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) return next();
   this.password = await bcrypt.hash(this.password, 10);
@@ -54,7 +54,7 @@ userSchema.pre("save", async function (next) {
 
 const User = mongoose.model("User", userSchema);
 
-// Register a new user
+
 app.post("/api/register", async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -66,7 +66,7 @@ app.post("/api/register", async (req, res) => {
   }
 });
 
-// Login and generate JWT token
+
 app.post("/api/login", async (req, res) => {
   const { username, password } = req.body;
   try {
@@ -79,7 +79,7 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).send("Invalid credentials");
     }
     const token = jwt.sign({ userId: user._id }, secretKey, {
-      expiresIn: "1h", // You can adjust the expiration time
+      expiresIn: "1h", 
     });
     res.json({ token });
   } catch (error) {
@@ -87,7 +87,7 @@ app.post("/api/login", async (req, res) => {
   }
 });
 
-// Middleware to verify JWT token
+
 const verifyToken = (req, res, next) => {
   const token = req.header("Authorization");
   if (!token) return res.status(401).send("Access denied");
@@ -101,7 +101,7 @@ const verifyToken = (req, res, next) => {
 };
 
 
-// Create a new note (authenticated route)
+
 app.post("/api/notes", verifyToken, async (req, res) => {
   const newNote = new Note({
     userId: req.userId,
@@ -116,7 +116,7 @@ app.post("/api/notes", verifyToken, async (req, res) => {
   }
 });
 
-// Get all notes for a user (authenticated route)
+
 app.get("/api/notes", verifyToken, async (req, res) => {
   try {
     const notes = await Note.find({ userId: req.userId });
@@ -126,7 +126,7 @@ app.get("/api/notes", verifyToken, async (req, res) => {
   }
 });
 
-// Update a note (authenticated route)
+
 app.put("/api/notes/:noteId", verifyToken, async (req, res) => {
   try {
     const updatedNote = await Note.findOneAndUpdate(
@@ -144,7 +144,7 @@ app.put("/api/notes/:noteId", verifyToken, async (req, res) => {
   }
 });
 
-// Delete a note (authenticated route)
+
 app.delete("/api/notes/:noteId", verifyToken, async (req, res) => {
   try {
     const deletedNote = await Note.findOneAndDelete({
@@ -161,7 +161,6 @@ app.delete("/api/notes/:noteId", verifyToken, async (req, res) => {
   }
 });
 
-// Add a book to favorites (authenticated route)
 app.post("/api/favorites", verifyToken, async (req, res) => {
   const newFavorite = new Favorite({
     userId: req.userId,
@@ -179,7 +178,7 @@ app.post("/api/favorites", verifyToken, async (req, res) => {
   }
 });
 
-// Retrieve all favorite books (authenticated route)
+
 app.get("/api/favorites", verifyToken, async (req, res) => {
   try {
     const favorites = await Favorite.find({ userId: req.userId });
@@ -189,7 +188,6 @@ app.get("/api/favorites", verifyToken, async (req, res) => {
   }
 });
 
-// Delete a book from favorites (authenticated route)
 app.delete("/api/favorites/:bookId", verifyToken, async (req, res) => {
   try {
     const removedFavorite = await Favorite.findOneAndDelete({
